@@ -1,0 +1,90 @@
+<html>
+
+<header>
+  <script src="https://d3js.org/d3.v4.js"></script>
+  <script src="https://d3js.org/d3-contour.v1.min.js"></script>
+</header>
+
+<body>
+  <div>
+    <svg id="xy-plane" width="600" height="400" stroke-width="0.5">
+  </div>
+  <script>
+    // Generate data
+    var n = 100,
+      m = 150;
+    amplitudes = new Float32Array(n * m);
+
+    // Standard Normal variate using Box-Muller transform.
+    function randn_bm() {
+      var u = 0,
+        v = 0;
+      while (u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+      while (v === 0) v = Math.random();
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+
+    amplitudes.forEach(function(amp, idx, array) {
+      //console.log(amp, idx);
+      array[idx] = randn_bm();
+    });
+
+    // Contour parameters
+    var contour_params = {
+      threshold: 1.0,
+      factor: 1.4,
+      number: 16,
+      sign: "both"
+    };
+
+    update_contour_levels(contour_params);
+
+    function update_contour_levels(cp) {
+      var levels_positive = [],
+        levels_negative = [];
+      for (var i = 0; i < cp.number; i++) {
+        levels_positive[i] = cp.threshold * cp.factor ** i;
+        levels_negative[i] = -levels_positive[i];
+      }
+      levels_negative.reverse();
+      cp.levels = levels_negative.concat(levels_positive);
+    }
+
+    // Actual spectrum contour plot
+    xy_plane = {};
+
+    xy_plane.svg = d3.select("#xy-plane");
+    xy_plane.width = +xy_plane.svg.attr("width");
+    xy_plane.height = +xy_plane.svg.attr("height");
+
+    xy_plane.spc_path = xy_plane.svg.selectAll("path")
+      .data(d3.contours()
+        .size([n, m])
+        .thresholds(contour_params.levels)
+        // .smooth(false)
+        (amplitudes))
+      .enter()
+      .append("path")
+      .attr("d", d3.geoPath(null)
+        .projection(matrix_transformation(xy_plane.width / n, 0, 0, -xy_plane.height / m, 0, xy_plane.height))) // full svg
+      .attr("fill", function(d) {
+        return "transparent";
+      })
+      .attr("stroke", function(d) {
+        if (d.value > 0) return d3.color("rgb(255, 0, 0)");
+        else if (d.value < 0) return d3.color("rgb(0, 255, 0)");
+        else return d3.color("rgb(255, 255, 0)");
+      })
+      .attr("vector-effect", "non-scaling-stroke");
+
+    function matrix_transformation(a, b, c, d, tx, ty) {
+      return d3.geoTransform({
+        point: function(x, y) {
+          this.stream.point(a * x + b * y + tx, c * x + d * y + ty);
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
