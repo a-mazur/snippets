@@ -9,8 +9,8 @@ amplitudes.forEach(function(amp, idx, array) {
   //console.log(amp, idx);
   let iy = Math.trunc(idx / N),
     ix = idx % N;
-  array[idx] = 100 * gauss2D(ix, iy, 20.0, 60.0, 0.5) +
-    -100 * gauss2D(ix, iy, 30.0, 10.0, 0.5) +
+  array[idx] = 30 * gauss2D(ix + 0.5, iy + 0.5, 20.0, 60.0, 3.0) +
+    -30 * gauss2D(ix + 0.5, iy + 0.5, 30.0, 10.0, 1.0) +
     randn_bm();
 });
 
@@ -29,8 +29,8 @@ var peaks = [{
 
 // Contour parameters
 var contour_params = {
-  threshold: 1.0,
-  factor: 1.20,
+  threshold: 2.0,
+  factor: 1.30,
   number: 16,
   sign: "both"
 };

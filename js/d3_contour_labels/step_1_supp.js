@@ -10,8 +10,8 @@ function randn_bm() {
 }
 
 function gauss2D(x, y, x0, y0, sigma) {
-  let r = Math.sqrt((x - x0) ** 2 + (y - y0) ** 2)
-  return Math.exp((-r / sigma) ^ 2)
+  let r = Math.sqrt((x - x0) ** 2 + (y - y0) ** 2);
+  return Math.exp(-(r*r / (2*sigma*sigma)));
 }
 
 function update_contour_levels(cp) {
