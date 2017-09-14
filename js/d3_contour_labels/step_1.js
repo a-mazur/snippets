@@ -1,31 +1,38 @@
 "use strict";
 
 // Generate data
-const N = 100,
-  M = 150,
+const N = 320,
+  M = 240,
   amplitudes = new Float32Array(N * M);
+
+// Peaks
+var peaks = [{
+    x: 250,
+    y: 160,
+    label: "red",
+    amplitude: 30,
+    sigma: 3.0
+  },
+  {
+    x: 30,
+    y: 10,
+    label: "green",
+    amplitude: -20,
+    sigma: 2.0
+  }
+];
 
 amplitudes.forEach(function(amp, idx, array) {
   //console.log(amp, idx);
   let iy = Math.trunc(idx / N),
     ix = idx % N;
-  array[idx] = 30 * gauss2D(ix + 0.5, iy + 0.5, 20.0, 60.0, 3.0) +
-    -30 * gauss2D(ix + 0.5, iy + 0.5, 30.0, 10.0, 1.0) +
-    randn_bm();
+  // noise
+  array[idx] = randn_bm();
+  // peaks
+  peaks.forEach((p) => {
+    array[idx] += p.amplitude * gauss2D(ix + 0.5, iy + 0.5, p.x, p.y, p.sigma)
+  });
 });
-
-// Peaks
-var peaks = [{
-    x: 20,
-    y: 60,
-    label: "red"
-  },
-  {
-    x: 30,
-    y: 10,
-    label: "green"
-  }
-];
 
 // Contour parameters
 var contour_params = {
@@ -85,6 +92,9 @@ xy_plane.x = d3.scaleLinear()
 xy_plane.y = d3.scaleLinear()
   .domain([M, 0])
   .range([0, xy_plane.height]);
+
+xy_plane.cx = xy_plane.x;
+xy_plane.cy = xy_plane.y;
 
 xy_plane.xAxis = d3.axisBottom(xy_plane.x); //.ticks(null, ".1f");
 xy_plane.gX = graph.main_g.append("g")
@@ -259,15 +269,10 @@ function up_peaks() {
 }
 
 function getZoomedScales(axis) {
-  // update_peaks([]);
-
   if (axis == "x") {
     var tX = d3.zoomTransform(graph.overlayX.node());
+    xy_plane.cx = tX.rescaleX(xy_plane.x); // current x
     xy_plane.gX.call(xy_plane.xAxis.scale(tX.rescaleX(xy_plane.x)));
-
-    // var t_matrix = "matrix(" + tX.k + ",0,0,1," + tX.x + ",0)";
-    // console.log(t_matrix);
-    // console.log(xy_plane.spc_path.attr("transform"));
 
     xy_plane.spc_path.mtx.kx = tX.k;
     xy_plane.spc_path.mtx.tx = tX.x;
@@ -277,12 +282,11 @@ function getZoomedScales(axis) {
 
     xy_plane.spc_path.attr("transform", t_matrix);
 
-    // update_peaks(peaks);
     up_peaks();
-
   }
   if (axis == "y") {
     var tY = d3.zoomTransform(graph.overlayY.node());
+    xy_plane.cy = tY.rescaleY(xy_plane.y); // current y
     xy_plane.gY.call(xy_plane.yAxis.scale(tY.rescaleY(xy_plane.y)));
 
     xy_plane.spc_path.mtx.ky = tY.k;
@@ -291,21 +295,13 @@ function getZoomedScales(axis) {
     var t_matrix = "matrix(" + xy_plane.spc_path.mtx.kx + ",0,0," + xy_plane.spc_path.mtx.ky + "," +
       xy_plane.spc_path.mtx.tx + "," + xy_plane.spc_path.mtx.ty + ")";
 
-    // update_peaks(peaks);
-    up_peaks()
-
-    // var trx = "translate(" + -xy_plane.spc_path.mtx.tx + "," + -xy_plane.spc_path.mtx.ty + ")";
-    // // console.log(trx)
-    // xy_plane.peaks.attr("transform", trx);
-    // xy_plane.peak_labels.attr("transform", trx);
-
-    // xy_plane.spc_path.attr("transform", t_matrix);
-    // xy_plane.peaks.attr("transform", t_matrix);
-    // xy_plane.peak_labels.attr("transform", t_matrix);
+    up_peaks();
   }
 }
 
 function rectZoom() {
+  d3.event.preventDefault();
+
   var element = this;
   var mouseOrigin = d3.mouse(element);
   var rect = null;
@@ -319,6 +315,12 @@ function rectZoom() {
   mouseOrigin[0] = Math.max(0, Math.min(xy_plane.width, mouseOrigin[0]));
   mouseOrigin[1] = Math.max(0, Math.min(xy_plane.height, mouseOrigin[1]));
 
+  if (d3.event.shiftKey) {
+    console.log("select", mouseOrigin);
+    console.log("x, y: ", xy_plane.x.invert(mouseOrigin[0]), xy_plane.y.invert(mouseOrigin[1]))
+    console.log("x, y: ", xy_plane.cx.invert(mouseOrigin[0]), xy_plane.cy.invert(mouseOrigin[1]))
+    return;
+  }
 
   d3.select(window)
     .on("mousemove.drag", function() {
@@ -403,7 +405,7 @@ function rectZoom() {
         .attr("height", Math.abs(m[1] - mouseOrigin[1]));
     })
     .on("mouseup.zoomRect", function() {
-      if (!d3.event.ctrlKey || rect === null) {// rect === null happens when ctrl pressed during drag
+      if (!d3.event.ctrlKey || rect === null) { // rect === null happens when ctrl pressed during drag
         return;
       }
 
