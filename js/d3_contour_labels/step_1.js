@@ -63,7 +63,7 @@ xy_plane.height = graph.height - graph.margins.top - graph.margins.bottom;
 
 graph.main_g = graph.svg
   .append("g")
-  .attr("class", "main")
+  .attr("id", "main-g")
   .attr("transform", function() {
     return "translate(" + graph.margins.left + "," + graph.margins.top + ")";
   });
@@ -78,11 +78,13 @@ graph.svg.append("clipPath")
 
 graph.data_clip = graph.main_g
   .append("g")
+  .attr("id", "data-clip")
   .attr("clip-path", "url(#clip)"); //append clip path to limit visibility
 
 graph.data_g = graph.data_clip
   .append("g")
-  .attr("class", "data-group")
+  .attr("id", "data-group")
+  // .attr("class", "data-group")
   .attr("clip-path", "url(#clip)");
 
 xy_plane.x = d3.scaleLinear()
@@ -96,13 +98,19 @@ xy_plane.y = d3.scaleLinear()
 xy_plane.cx = xy_plane.x;
 xy_plane.cy = xy_plane.y;
 
-xy_plane.xAxis = d3.axisBottom(xy_plane.x); //.ticks(null, ".1f");
+xy_plane.xAxis = d3.axisBottom(xy_plane.x)
+  .ticks(5)
+  .tickSize(-xy_plane.height)
+
 xy_plane.gX = graph.main_g.append("g")
   .attr("class", "axis axis--x")
   .call(xy_plane.xAxis)
   .attr("transform", "translate(0," + xy_plane.height + ")");
 
-xy_plane.yAxis = d3.axisLeft(xy_plane.y); //.ticks(null, ".1f");
+xy_plane.yAxis = d3.axisLeft(xy_plane.y)
+  .ticks(5)
+  .tickSize(-xy_plane.width);
+
 xy_plane.gY = graph.main_g.append("g")
   .attr("class", "axis axis--y")
   .call(xy_plane.yAxis)
@@ -111,6 +119,7 @@ xy_plane.gY = graph.main_g.append("g")
 xy_plane.plot = function() {
   xy_plane.spc_path = graph.data_g
     .append("g")
+    .attr("id", "contour-group")
     .selectAll("path")
     .data(d3.contours()
       .size([N, M])
@@ -138,12 +147,15 @@ xy_plane.plot = function() {
   };
 
   xy_plane.peaks_g = graph.data_g.append("g")
-    .attr("id", "peaks");
+    .attr("id", "peak-group");
 
   update_peaks(peaks)
 }
 
 xy_plane.plot();
+
+d3.selectAll(".tick").selectAll("line")
+  .attr("opacity", "0.3");
 
 graph.overlayX = graph.main_g
   .append("rect")
@@ -191,16 +203,11 @@ graph.zoomY = d3.zoom()
     zoomed("y");
   });
 
-function zoomed(axis) {
-  getZoomedScales(axis);
-  // updateGraph();
-}
-
 function update_peaks(pks) {
 
   let ms = 5;
 
-  var sele = d3.select("#peaks")
+  var sele = xy_plane.peaks_g
     .selectAll("polyline")
     .data(pks)
 
@@ -235,7 +242,7 @@ function update_peaks(pks) {
 }
 
 function up_peaks() {
-  d3.select("#peaks")
+  xy_plane.peaks_g
     .selectAll("polyline").each(function(d, i) {
       var sel = d3.select(this);
 
@@ -255,20 +262,20 @@ function up_peaks() {
       })
     })
 
-  d3.select("#peaks")
+  xy_plane.peaks_g
     .selectAll("text").each(function(d, i) {
       var sel = d3.select(this);
       let x = xy_plane.x(d.x) * xy_plane.spc_path.mtx.kx + xy_plane.spc_path.mtx.tx + 5,
         y = xy_plane.y(d.y) * xy_plane.spc_path.mtx.ky + xy_plane.spc_path.mtx.ty - 5;
 
-      console.log(d, x, y)
+      // console.log(d, x, y)
 
       sel.attr("x", x);
       sel.attr("y", y);
     })
 }
 
-function getZoomedScales(axis) {
+function zoomed(axis) {
   if (axis == "x") {
     var tX = d3.zoomTransform(graph.overlayX.node());
     xy_plane.cx = tX.rescaleX(xy_plane.x); // current x
@@ -282,6 +289,7 @@ function getZoomedScales(axis) {
 
     xy_plane.spc_path.attr("transform", t_matrix);
 
+    console.log("x:", t_matrix)
     up_peaks();
   }
   if (axis == "y") {
@@ -295,8 +303,13 @@ function getZoomedScales(axis) {
     var t_matrix = "matrix(" + xy_plane.spc_path.mtx.kx + ",0,0," + xy_plane.spc_path.mtx.ky + "," +
       xy_plane.spc_path.mtx.tx + "," + xy_plane.spc_path.mtx.ty + ")";
 
+    xy_plane.spc_path.attr("transform", t_matrix);
+
+    console.log("y:", t_matrix)
     up_peaks();
   }
+  d3.selectAll(".tick").selectAll("line")
+    .attr("opacity", "0.3");
 }
 
 function rectZoom() {
@@ -357,35 +370,38 @@ function rectZoom() {
       m[1] = Math.max(0, Math.min(xy_plane.height, m[1]));
 
       if (m[0] !== mouseOrigin[0] && m[1] !== mouseOrigin[1]) {
-        console.log(mouseOrigin, m)
+        console.log("mouse:", mouseOrigin, m)
 
         var e = graph.overlayX; //graph.overlayX;
         var t = d3.zoomTransform(e.node());
 
         var translateX = mouseOrigin[0] - m[0]; //Math.min(m[0], mouseOrigin[0]);
 
-        e.transition()
-          // .duration(750)
-          .call(graph.zoomX.transform, d3.zoomIdentity
-            // .scale(scaleFactor)
-            .translate(-translateX, 0)
-            .translate(t.x, 0)
-            .scale(t.k)
-          );
+        console.log("t_x:", translateX, t.x, t.k)
+
+        // e.transition()
+        // .duration(750)
+        e.call(graph.zoomX.transform, d3.zoomIdentity
+          // .scale(scaleFactor)
+          .translate(-translateX, 0)
+          .translate(t.x, 0)
+          .scale(t.k)
+        );
 
         var e = graph.overlayY; //graph.overlayX;
         var t = d3.zoomTransform(e.node());
 
         var translateY = mouseOrigin[1] - m[1]; //Math.min(m[0], mouseOrigin[0]);
 
-        e.transition()
-          // .duration(750)
-          .call(graph.zoomY.transform, d3.zoomIdentity
-            // .scale(scaleFactor)
-            .translate(0, -translateY)
-            .translate(0, t.y)
-            .scale(t.k)
-          );
+        console.log("t_y:", translateY, t.y, t.k)
+        // e.transition()
+        // .duration(750)
+        e.call(graph.zoomY.transform, d3.zoomIdentity
+          // .scale(scaleFactor)
+          .translate(0, -translateY)
+          .translate(0, t.y)
+          .scale(t.k)
+        );
       };
     })
     // Zoom
@@ -432,17 +448,18 @@ function rectZoom() {
         var x = t.x;
         var translateX = Math.min(m[0], mouseOrigin[0]);
 
-        console.log(translateX, scaleFactor)
-        console.log(x, k)
+        console.log("x:", translateX, scaleFactor)
+        console.log("x:", x, k)
 
-        e.transition()
-          // .duration(750)
-          .call(graph.zoomX.transform, d3.zoomIdentity
-            .scale(scaleFactor)
-            .translate(-translateX, 0)
-            .translate(x, 0)
-            .scale(k)
-          );
+        // e.transition()
+        // .duration(750)
+        e.call(graph.zoomX.transform, d3.zoomIdentity
+          .scale(scaleFactor)
+          .translate(-translateX, 0)
+          .translate(x, 0)
+          .scale(k)
+        );
+        zoomed("x");
 
         var zoomRectHeight = Math.abs(m[1] - mouseOrigin[1]);
         var scaleFactor = xy_plane.height / zoomRectHeight;
@@ -453,32 +470,36 @@ function rectZoom() {
         var y = t.y;
         var translateY = Math.min(m[1], mouseOrigin[1]);
 
-        e.transition()
-          // .duration(750)
-          .call(graph.zoomY.transform, d3.zoomIdentity
-            .scale(scaleFactor)
-            .translate(0, -translateY)
-            .translate(0, y)
-            .scale(k)
-          );
+        console.log("y:", translateY, scaleFactor)
+        console.log("y:", y, k)
+
+        // e.transition()
+        // .duration(750)
+        e.call(graph.zoomY.transform, d3.zoomIdentity
+          .scale(scaleFactor)
+          .translate(0, -translateY)
+          .translate(0, y)
+          .scale(k)
+        );
+        zoomed("y");
       }
       rect.remove();
     }, true);
 
-  d3.event.stopPropagation();
+  // d3.event.stopPropagation();
 }
 
 function resetZoom() {
   graph.overlayX
-    .transition()
-    .duration(100)
+    // .transition()
+    // .duration(100)
     .call(graph.zoomX.transform, d3.zoomIdentity);
 
   graph.overlayY
-    .transition()
-    .duration(100)
+    // .transition()
+    // .duration(100)
     .call(graph.zoomY.transform, d3.zoomIdentity);
 
-  getZoomedScales("x");
-  getZoomedScales("y");
+  zoomed("x");
+  zoomed("y");
 }
