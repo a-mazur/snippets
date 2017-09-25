@@ -290,7 +290,6 @@ function zoomed(axis) {
     xy_plane.spc_path.attr("transform", t_matrix);
 
     console.log("x:", t_matrix)
-    up_peaks();
   }
   if (axis == "y") {
     var tY = d3.zoomTransform(graph.overlayY.node());
@@ -306,8 +305,9 @@ function zoomed(axis) {
     xy_plane.spc_path.attr("transform", t_matrix);
 
     console.log("y:", t_matrix)
-    up_peaks();
   }
+
+  up_peaks();
   d3.selectAll(".tick").selectAll("line")
     .attr("opacity", "0.3");
 }
@@ -340,13 +340,15 @@ function rectZoom() {
       if (d3.event.ctrlKey) {
         return;
       }
-      // console.log("d,i", d, i)
+      console.log("mouse move.drag")
+
       let m = d3.mouse(element);
 
       m[0] = Math.max(0, Math.min(xy_plane.width, m[0]));
       m[1] = Math.max(0, Math.min(xy_plane.height, m[1]));
 
-      // drag("dragged");
+      dragged(mouseOrigin, m);
+      mouseOrigin = m;
     })
     .on("mouseup.drag", function() {
       if (d3.event.ctrlKey) {
@@ -355,61 +357,20 @@ function rectZoom() {
 
       if (rect != null) { // if ctrl released before mouse down
         rect.remove();
-        d3.select(window)
-          .on("mousemove.zoomRect", null)
-          .on("mouseup.zoomRect", null);
       }
 
       d3.select(window)
         .on("mousemove.drag", null)
-        .on("mouseup.drag", null);
-
-      let m = d3.mouse(element);
-
-      m[0] = Math.max(0, Math.min(xy_plane.width, m[0]));
-      m[1] = Math.max(0, Math.min(xy_plane.height, m[1]));
-
-      if (m[0] !== mouseOrigin[0] && m[1] !== mouseOrigin[1]) {
-        console.log("mouse:", mouseOrigin, m)
-
-        var e = graph.overlayX; //graph.overlayX;
-        var t = d3.zoomTransform(e.node());
-
-        var translateX = mouseOrigin[0] - m[0]; //Math.min(m[0], mouseOrigin[0]);
-
-        console.log("t_x:", translateX, t.x, t.k)
-
-        // e.transition()
-        // .duration(750)
-        e.call(graph.zoomX.transform, d3.zoomIdentity
-          // .scale(scaleFactor)
-          .translate(-translateX, 0)
-          .translate(t.x, 0)
-          .scale(t.k)
-        );
-
-        var e = graph.overlayY; //graph.overlayX;
-        var t = d3.zoomTransform(e.node());
-
-        var translateY = mouseOrigin[1] - m[1]; //Math.min(m[0], mouseOrigin[0]);
-
-        console.log("t_y:", translateY, t.y, t.k)
-        // e.transition()
-        // .duration(750)
-        e.call(graph.zoomY.transform, d3.zoomIdentity
-          // .scale(scaleFactor)
-          .translate(0, -translateY)
-          .translate(0, t.y)
-          .scale(t.k)
-        );
-      };
+        .on("mouseup.drag", null)
+        .on("mousemove.zoomRect", null)
+        .on("mouseup.zoomRect", null);
     })
     // Zoom
     .on("mousemove.zoomRect", function() {
       if (!d3.event.ctrlKey || rect === null) { // rect === null happens when ctrl pressed during drag
         return;
       }
-      // console.log("d,i", d, i)
+
       let m = d3.mouse(element);
 
       m[0] = Math.max(0, Math.min(xy_plane.width, m[0]));
@@ -426,6 +387,8 @@ function rectZoom() {
       }
 
       d3.select(window)
+        .on("mousemove.drag", null)
+        .on("mouseup.drag", null)
         .on("mousemove.zoomRect", null)
         .on("mouseup.zoomRect", null);
 
@@ -434,72 +397,68 @@ function rectZoom() {
       m[0] = Math.max(0, Math.min(xy_plane.width, m[0]));
       m[1] = Math.max(0, Math.min(xy_plane.height, m[1]));
 
-      if (m[0] !== mouseOrigin[0] && m[1] !== mouseOrigin[1]) {
-        console.log(mouseOrigin, m)
-        // console.log(xy_plane.x.invert(mouseOrigin[0]), xy_plane.y.invert(mouseOrigin[1]))
-        // console.log(xy_plane.x.invert(m[0]), xy_plane.y.invert(m[1]))
+      dragged(mouseOrigin, m, true);
 
-        var zoomRectWidth = Math.abs(m[0] - mouseOrigin[0]);
-        var scaleFactor = xy_plane.width / zoomRectWidth;
-
-        var e = graph.overlayX; //graph.overlayX;
-        var t = d3.zoomTransform(e.node());
-        var k = t.k;
-        var x = t.x;
-        var translateX = Math.min(m[0], mouseOrigin[0]);
-
-        console.log("x:", translateX, scaleFactor)
-        console.log("x:", x, k)
-
-        // e.transition()
-        // .duration(750)
-        e.call(graph.zoomX.transform, d3.zoomIdentity
-          .scale(scaleFactor)
-          .translate(-translateX, 0)
-          .translate(x, 0)
-          .scale(k)
-        );
-        zoomed("x");
-
-        var zoomRectHeight = Math.abs(m[1] - mouseOrigin[1]);
-        var scaleFactor = xy_plane.height / zoomRectHeight;
-
-        var e = graph.overlayY;
-        var t = d3.zoomTransform(e.node());
-        var k = t.k;
-        var y = t.y;
-        var translateY = Math.min(m[1], mouseOrigin[1]);
-
-        console.log("y:", translateY, scaleFactor)
-        console.log("y:", y, k)
-
-        // e.transition()
-        // .duration(750)
-        e.call(graph.zoomY.transform, d3.zoomIdentity
-          .scale(scaleFactor)
-          .translate(0, -translateY)
-          .translate(0, y)
-          .scale(k)
-        );
-        zoomed("y");
-      }
       rect.remove();
     }, true);
 
-  // d3.event.stopPropagation();
+  d3.event.stopPropagation();
 }
 
 function resetZoom() {
   graph.overlayX
-    // .transition()
-    // .duration(100)
+    // .transition().duration(100)
     .call(graph.zoomX.transform, d3.zoomIdentity);
 
   graph.overlayY
-    // .transition()
-    // .duration(100)
+    // .transition().duration(100)
     .call(graph.zoomY.transform, d3.zoomIdentity);
+}
 
-  zoomed("x");
-  zoomed("y");
+function dragged(m0, m1, zoom = false) {
+  if (!zoom || m1[0] !== m0[0] && m1[1] !== m0[1]) {
+    console.log("mouse:", m0, m1)
+
+    var scaleFactor = 1.0;
+    if (zoom) {
+      var zoomRectWidth = Math.abs(m1[0] - m0[0]);
+      scaleFactor = xy_plane.width / zoomRectWidth;
+    }
+    var e = graph.overlayX;
+    var t = d3.zoomTransform(e.node());
+
+    var translateX = m0[0] - m1[0];
+    if (zoom)
+      translateX = Math.min(m0[0], m1[0]);
+
+    console.log("t_x:", translateX, t.x, t.k)
+
+    // e.transition().duration(750)
+    e.call(graph.zoomX.transform, d3.zoomIdentity
+      .scale(scaleFactor)
+      .translate(-translateX, 0)
+      .translate(t.x, 0)
+      .scale(t.k)
+    );
+
+    if (zoom) {
+      var zoomRectHeight = Math.abs(m1[1] - m0[1]);
+      scaleFactor = xy_plane.height / zoomRectHeight;
+    }
+    var e = graph.overlayY;
+    var t = d3.zoomTransform(e.node());
+
+    var translateY = m0[1] - m1[1];
+    if (zoom)
+      translateY = Math.min(m0[1], m1[1]);
+
+    console.log("t_y:", translateY, t.y, t.k)
+    // e.transition().duration(750)
+    e.call(graph.zoomY.transform, d3.zoomIdentity
+      .scale(scaleFactor)
+      .translate(0, -translateY)
+      .translate(0, t.y)
+      .scale(t.k)
+    );
+  };
 }
